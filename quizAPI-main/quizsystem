@@ -1,0 +1,93 @@
+<?php
+
+$host = 'localhost';
+$dbname = 'quizsystem';
+$username = 'root';
+$password = ''; 
+
+try {
+
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
+
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    echo "Connection failed: " . $e->getMessage();
+    exit;
+}
+
+
+class QuizSystem {
+    protected $pdo;
+
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
+    }
+
+    public function createQuiz($title, $description) {
+        $sql = "INSERT INTO quizzes (title, description) VALUES (?, ?)";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$title, $description]);
+        
+        return $this->pdo->lastInsertId();
+    }
+
+    public function createQuestions($quizId, $questions) {
+        if (empty($quizId) || !is_array($questions) || count($questions) === 0) {
+            return ["error" => "Quiz ID and a non-empty questions array are required."];
+        }
+    
+        foreach ($questions as $question) {
+            if (!isset($question['question_text']) || empty($question['question_text'])) {
+                return ["error" => "Each question must include a 'question_text' field."];
+            }
+    
+            $questionText = $question['question_text'];
+            $sql = "INSERT INTO questions (quiz_id, question_text) VALUES (?, ?)";
+            $stmt = $this->pdo->prepare($sql);
+    
+            try {
+                $stmt->execute([$quizId, $questionText]);
+                $questionId = $this->pdo->lastInsertId(); // Get the inserted question ID
+            } catch (PDOException $e) {
+                return ["error" => "Failed to insert question: " . $e->getMessage()];
+            }
+    
+            // Check if answers are provided and valid
+            if (isset($question['answers']) && is_array($question['answers'])) {
+                $this->createAnswers($questionId, $question['answers']);
+            } else {
+                return ["error" => "Answers are missing or invalid for question: $questionText"];
+            }
+        }
+    
+        return ["success" => true];
+    }
+    
+    public function createAnswers($questionId, $answers) {
+        if (empty($questionId) || !is_array($answers) || count($answers) === 0) {
+            echo "Invalid question ID or answers array.\n";
+            return;
+        }
+    
+        foreach ($answers as $answer) {
+            if (isset($answer['answer_text']) && isset($answer['is_correct'])) {
+                $answerText = $answer['answer_text'];
+                $isCorrect = $answer['is_correct'] ? 1 : 0;
+    
+                $sql = "INSERT INTO answers (question_id, answer_text, is_correct) VALUES (?, ?, ?)";
+                $stmt = $this->pdo->prepare($sql);
+    
+                try {
+                    $stmt->execute([$questionId, $answerText, $isCorrect]);
+                } catch (PDOException $e) {
+                    echo "Error inserting answer: " . $e->getMessage() . "\n";
+                }
+            } else {
+                echo "Missing 'answer_text' or 'is_correct' in answer array.\n";
+            }
+        }
+    }
+    
+    
+}
+?>

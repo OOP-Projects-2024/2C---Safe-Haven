@@ -1,0 +1,195 @@
+<?php 
+class Authentication{
+
+    protected $pdo;
+    
+    public function __construct(\PDO $pdo){
+        $this->pdo = $pdo;
+    }
+
+    public function isAuthorized(){
+        $headers = array_change_key_case(getallheaders(),CASE_LOWER);
+        return $this->gettoken() === $headers['authorization'];
+    }
+
+    private function gettoken(){
+        $headers = array_change_key_case(getallheaders(),CASE_LOWER);
+
+        $sqlString = "SELECT token FROM account_tbl WHERE Username=?";
+        try{
+            $stmt = $this->pdo->prepare($sqlString);
+            $stmt->execute([$headers['x-auth-user']]);
+            $result = $stmt->fetchAll()[0];
+            return $result['token'];
+        }
+        catch(Exception $e){
+            echo $e->getMessage();
+        }
+        return "";
+    }
+
+    private function generateHeader(){
+        $header = [
+            "typ" => "JWT",
+            "alg" => "HS256",
+            "app" => "QUIZ System for Students "
+        ];
+        return base64_encode(json_encode($header));
+    }
+
+    private function generatePayload($id, $username){
+        $payload = [
+            "user_id" => $id,
+            "user_cred" => $username,
+        ];
+        return base64_encode(json_encode($payload));
+    }
+
+    private function generateToken($id, $username){
+        $header = $this->generateHeader();
+        $payload = $this->generatePayload($id, $username);
+        $signature = base64_encode(hash_hmac("sha256", "$header.$payload", "your_secret_key", true));
+        return "$header.$payload.$signature";
+    }
+    private function isSamePassword($inputPassword, $existingHash){
+        return password_verify($inputPassword, $existingHash);
+        
+    }
+
+    private function encryptPassword($password){
+        return password_hash($password, PASSWORD_BCRYPT);
+        //$password = "YourPassword";
+       // $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+       // echo $hashedPassword;
+    }
+
+    private function generateSalt($length){
+        $urs = md5(uniqid(mt_rand(), true));
+        $b64String = base64_encode($urs);
+        $mb64String = str_replace("+", ".", $b64String);
+        return substr($mb64String, 0, $length);
+    }
+    public function saveToken($token, $username){
+        
+        $errmsg = "";
+        $code = 0;
+        
+        try{
+            $sqlString = "UPDATE account_tbl SET token=? WHERE Username = ?";
+            $sql = $this->pdo->prepare($sqlString);
+            $sql->execute( [$token, $username] );
+
+            $code = 200;
+            $data = null;
+
+            return array("data"=>$data, "code"=>$code);
+        }
+        catch(\PDOException $e){
+            $errmsg = $e->getMessage();
+            $code = 400;
+        }
+
+        
+        return array("errmsg"=>$errmsg, "code"=>$code);
+
+    }
+
+    public function login($body) {
+        $username = $body['Username'] ?? null;
+        $password = $body['Password'] ?? null;
+        
+        $code = 0;
+        $payload = "";
+        $remarks = "";
+        $message = "";
+    
+        try {
+            // Ensure username and password are provided
+            if (empty($username) || empty($password)) {
+                throw new \Exception("Username and password are required.");
+            }
+    
+            // Get the user record from the database
+            $sqlString = "SELECT id, Username, Password FROM account_tbl WHERE Username = ?";
+            $stmt = $this->pdo->prepare($sqlString);
+            $stmt->execute([$username]);
+    
+            if ($stmt->rowCount() > 0) {
+                $result = $stmt->fetch();
+    
+                if (password_verify($password, $result['Password'])) {
+                    $code = 200;
+                    $remarks = "Success";
+                    $message = "Logged in successfully";
+    
+                    $token = $this->generateToken($result['id'], $result['Username']);
+                    $token_arr = explode('.', $token);
+    
+                    $this->saveToken($token_arr[2], $result['Username']);
+    
+                    $payload = array("id" => $result['id'], "Username" => $result['Username'], "token" => $token_arr[2]);
+                } else {
+                    $code = 401;
+                    $payload = null;
+                    $remarks = "Failed";
+                    $message = "Incorrect Password.";
+                }
+            } else {
+                $code = 401;
+                $payload = null;
+                $remarks = "Failed";
+                $message = "Username does not exist.";
+            }
+        }
+        catch(\PDOException $e) {
+            $message = "Database error: " . $e->getMessage();
+            $remarks = "Failed";
+            $code = 400;
+        }
+        catch(\Exception $e) {
+            $message = $e->getMessage();
+            $remarks = "Failed";
+            $code = 400;
+        }
+    
+        return array("payload" => $payload, "remarks" => $remarks, "message" => $message, "code" => $code);
+    }
+    
+    
+
+
+    public function addAccount($body) {
+        $values = [];
+        $errmsg = "";
+        $code = 0;
+    
+        $password = isset($body["Password"]) ? $this->encryptPassword($body["Password"]) : '';
+        
+
+        foreach($body as $key => $value) {
+            if ($key != 'Password') { 
+                array_push($values, $value);
+            }
+        }
+        
+        array_push($values, $password);
+    
+        try {
+            $sqlString = "INSERT INTO account_tbl (id, Username, Password) VALUES (?, ?, ?)";
+            $sql = $this->pdo->prepare($sqlString);
+            $sql->execute($values);
+            $code = 200;
+            $data = null;
+    
+            return array("data"=>$data, "code"=>$code);
+        }
+        catch(\PDOException $e) {
+            $errmsg = $e->getMessage();
+            $code = 400;
+        }
+    
+        return array("errmsg"=>$errmsg, "code"=>$code);
+    }
+    
+}
+?>

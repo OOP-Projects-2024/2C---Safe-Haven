@@ -1,0 +1,103 @@
+<?php
+class Get{
+
+    
+    protected $pdo;
+
+    public function __construct(\PDO $pdo){
+        $this->pdo = $pdo;
+    }
+     //GETADMIN
+    public function getAdmin($id = null){
+     
+        $sqlString = "SELECT * FROM admintable";
+        if($id != null){
+            $sqlString .= " WHERE adminID=" . $id; 
+        }
+
+        $data = array();
+        $errmsg = "";
+        $code = 0;
+
+        try{ 
+            if($result = $this->pdo->query($sqlString)->fetchAll()){
+                foreach($result as $record){
+                    array_push($data, $record);
+                }
+                $result = null;
+                $code = 200;
+                return array("code"=>$code, "data"=>$data); 
+            }
+            else{
+                $errmsg = "No data found";
+                $code = 404;
+            }
+        }
+        catch(\PDOException $e){
+            $errmsg = $e->getMessage();
+            $code = 403;
+        }
+
+        return array("code"=>$code, "errmsg"=>$errmsg);
+    }
+    
+
+    //GETSTUDENT
+    public function getStudent($id = NULL){
+        $sqlString = "SELECT * FROM studentable";
+        if($id != null){
+            $sqlString .= " WHERE studentID=" . $id; 
+        }
+
+
+        $data = array();
+        $errmsg = "";
+        $code = 0;
+
+
+        try{
+            if($result = $this->pdo->query($sqlString)->fetchAll()){
+                foreach($result as $record){
+                    array_push($data, $record);
+                }
+                $result = null;
+                $code = 200;
+                return array("code"=>$code, "data"=>$data); 
+            }
+            else{
+                $errmsg = "No data found";
+                $code = 404;
+            }
+        }
+        catch(\PDOException $e){
+            $errmsg = $e->getMessage();
+            $code = 403;
+        }
+    }
+         //GETQUESTION
+    public function getQuestion(){
+        //code for retrieving data on DB
+        return "This is some questions retrieved from db";
+    }
+        //GETQUIZ
+    public function getQuiz(){
+        return "This is some quiz retrieved from db";
+    }
+
+    public function getQuestionAnswers($quizId, $questionId) {
+        $sql = "SELECT a.id as answer_id, a.answer_text, a.is_correct 
+                FROM answers a
+                INNER JOIN questions q ON q.id = a.question_id
+                WHERE q.quiz_id = ? AND q.id = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$quizId, $questionId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+
+    
+
+
+
+}
+?>

@@ -1,0 +1,75 @@
+<?php
+class Patch {
+    protected $pdo;
+
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
+    }
+
+    // Update admin details
+    public function updateAdmin($id, $adminData) {
+        
+        try {
+            $sql = "UPDATE admintable SET username = :username, admin_email = :admin_email WHERE adminID = :admin_id";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                ':username' => $adminData['username'],
+                ':admin_email' => $adminData['admin_email'],
+                ':admin_id' => $id
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                return ["success" => "Admin updated successfully"];
+            } else {
+                return ["error" => "Admin not found or no changes made"];
+            }
+        } catch (PDOException $e) {
+            return ["error" => "Error updating admin: " . $e->getMessage()];
+        }
+    }
+
+
+    // Update student details
+    public function updateStudent($id, $studentData) {
+        try {
+            $sql = "UPDATE students SET name = :name, email = :email, course = :course WHERE id = :id";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                ':name' => $studentData['name'],
+                ':email' => $studentData['email'],
+                ':course' => $studentData['course'],
+                ':id' => $id
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                return ["success" => "Student updated successfully"];
+            } else {
+                return ["error" => "Student not found or no changes made"];
+            }
+        } catch (PDOException $e) {
+            return ["error" => "Error updating student: " . $e->getMessage()];
+        }
+    }
+
+    // Update professor details
+    public function updateProfessor($id, $professorData) {
+        try {
+            $sql = "UPDATE professors SET name = :name, email = :email, department = :department WHERE id = :id";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                ':name' => $professorData['name'],
+                ':email' => $professorData['email'],
+                ':department' => $professorData['department'],
+                ':id' => $id
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                return ["success" => "Professor updated successfully"];
+            } else {
+                return ["error" => "Professor not found or no changes made"];
+            }
+        } catch (PDOException $e) {
+            return ["error" => "Error updating professor: " . $e->getMessage()];
+        }
+    }
+}

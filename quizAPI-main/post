@@ -1,0 +1,78 @@
+<?php
+class Post {
+
+    protected $pdo;
+
+    public function __construct(\PDO $pdo) {
+        $this->pdo = $pdo;
+    }
+
+    public function postAdmin($body) {
+        return $this->insertIntoTable('admintable', ['adminID', 'username', 'admin_email', 'admin_password'], $body);
+    }
+
+    public function postProf($body) {
+        return $this->insertIntoTable('proftable', ['fname', 'lname', 'email', 'password'], $body);
+    }
+
+    public function postStudent($body) {
+        return $this->insertIntoTable('studentable', ['fname', 'lname', 'gradeLVL', 'email', 'password'], $body);
+    }
+
+    public function createAnswers($quizId, $questionId, $answers) {
+        if (!is_array($answers)) {
+            return ["error" => "Answers must be provided as an array."];
+        }
+    
+        foreach ($answers as $answer) {
+            if (isset($answer['answer_text']) && isset($answer['is_correct'])) {
+                $answerText = $answer['answer_text'];
+                $isCorrect = $answer['is_correct'] ? 1 : 0;
+    
+                $sql = "INSERT INTO answers (question_id, answer_text, is_correct) VALUES (?, ?, ?)";
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute([$questionId, $answerText, $isCorrect]);
+            } else {
+                return ["error" => "Each answer must have 'answer_text' and 'is_correct' fields."];
+            }
+        }
+    
+        return ["message" => "Answers successfully added for question ID: $questionId"];
+    }
+    
+
+    private function insertIntoTable($tableName, $columns, $body) {
+        if (!is_array($body)) {
+            return array("errmsg" => "Invalid input data", "code" => 400);
+        }
+
+        $values = [];
+        $errmsg = "";
+        $code = 0;
+
+        foreach ($columns as $column) {
+            if (!array_key_exists($column, $body)) {
+                return array("errmsg" => "Missing data for $column", "code" => 400);
+            }
+            $values[] = $body[$column];
+        }
+
+        try {
+            $placeholders = implode(',', array_fill(0, count($columns), '?'));
+            $sqlString = "INSERT INTO $tableName(" . implode(',', $columns) . ") VALUES ($placeholders)";
+            $sql = $this->pdo->prepare($sqlString);
+            $sql->execute($values);
+
+            $code = 200;
+            $data = null;
+
+            return array("data" => $data, "code" => $code);
+        } catch (\PDOException $e) {
+            $errmsg = $e->getMessage();
+            $code = 400;
+        }
+
+        return array("errmsg" => $errmsg, "code" => $code);
+    }
+}
+?>

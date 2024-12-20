@@ -1,0 +1,50 @@
+<?php
+class Delete {
+    protected $pdo;
+
+    public function __construct(\PDO $pdo) {
+        $this->pdo = $pdo;
+    }
+
+    public function deleteadmin($id) {
+        return $this->deleteRecord('admintable', 'adminID', $id);
+    }
+
+    public function deletestudent($id) {
+        return $this->deleteRecord('studenttable', 'studentID', $id);
+    }
+
+    public function deleteprof($id) {
+        return $this->deleteRecord('professortable', 'professorID', $id);
+    }
+
+    private function deleteRecord($table, $idField, $idValue) {
+        try {
+            $sqlString = "DELETE FROM $table WHERE $idField = ?";
+            $sql = $this->pdo->prepare($sqlString);
+
+            if (!$sql) {
+                error_log("SQL preparation error: " . implode(" ", $this->pdo->errorInfo()));
+                return ["errmsg" => "SQL preparation error.", "code" => 500];
+            }
+
+            $success = $sql->execute([$idValue]);
+
+            if ($success) {
+                $rowCount = $sql->rowCount();
+                if ($rowCount > 0) {
+                    return ["data" => "Record deleted successfully", "code" => 200];
+                } else {
+                    return ["errmsg" => "Record not found or already deleted.", "code" => 404];
+                }
+            } else {
+                error_log("SQL execution error: " . implode(" ", $sql->errorInfo()));
+                return ["errmsg" => "SQL execution error.", "code" => 500];
+            }
+        } catch (\PDOException $e) {
+            error_log("PDOException: " . $e->getMessage());
+            return ["errmsg" => $e->getMessage(), "code" => 400];
+        }
+    }
+}
+?>

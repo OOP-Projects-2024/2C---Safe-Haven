@@ -1,0 +1,214 @@
+<?php
+
+// Import required files
+require_once "./config/database.php";
+require_once "./modules/Get.php";
+require_once "./modules/Post.php";
+require_once "./modules/Patch.php"; 
+require_once "./modules/Delete.php";
+require_once "./modules/auth.php";
+require_once "./modules/QuizSystem.php";
+
+$db = new Connection();
+$pdo = $db->connect();
+
+// Instantiate classes
+$post = new Post($pdo);
+$patch = new Patch($pdo);
+$get = new Get($pdo);
+$delete = new Delete($pdo);
+$auth = new Authentication($pdo);
+$quizSystem = new QuizSystem($pdo);
+
+// Retrieve and split endpoints
+if (isset($_REQUEST['request'])) {
+    $request = explode("/", $_REQUEST['request']);
+} else {
+    echo "URL does not exist.";
+}
+
+// Get, Post, Put, Patch, Delete
+switch ($_SERVER['REQUEST_METHOD']) {
+
+    case "GET":
+        {
+        switch ($request[0]) {
+
+            case "admin":
+                if (count($request) > 1) {
+                    echo json_encode($get->getAdmin($request[1]));
+                } else {
+                    echo json_encode($get->getAdmin());
+                }
+                break;
+
+            case "faculty":
+                echo "This is my get faculty route.";
+                break;
+
+            case "student":
+                if (count($request) > 1) {
+                    echo json_encode($get->getStudent($request[1]));
+                } else {
+                    echo json_encode($get->getStudent());
+                }
+                break;
+
+             //Get all quizzes
+            case "quiz":
+                if (count($request) > 1 && is_numeric($request[1])) {
+                    echo json_encode($get->getQuiz($request[1]));
+                } else {
+                    echo json_encode($get->getQuiz());
+                }
+               break;
+
+            case "questions":
+               if (count($request) > 1 && is_numeric($request[1])) {
+                   echo json_encode($get->getQuestion($request[1]));
+                } else {
+                   http_response_code(400);
+                   echo "Quiz ID is required.";
+                }
+                break;
+
+            case "answers":
+                if (count($request) > 2 && is_numeric($request[1]) && is_numeric($request[2])) {
+                    echo json_encode($get->getQuestionAnswers($request[1], $request[2]));
+                } else {
+                    http_response_code(400);
+                    echo "Quiz ID and Question ID are required.";
+                }
+                break;
+
+         default:
+                http_response_code(401);
+                echo "Invalid endpoint.";
+                break;
+    }
+      break;
+}
+
+    case "POST":
+        {
+        $body = json_decode(file_get_contents("php://input"), true);
+        switch ($request[0]) {
+
+            case "admin":
+                echo json_encode($post->postAdmin($body));
+                break;
+
+            case "prof":
+                echo $post->postProf($body);
+                break;
+
+            case "login":
+                echo json_encode($auth->login($body));
+                break;
+
+            case "account":
+                echo json_encode($auth->addAccount($body));
+                break;
+
+            case "student":
+                echo json_encode($post->postStudent($body));
+                break;
+
+            case "quiz":
+                if (isset($body['title']) && isset($body['description'])) {
+                    $quizTitle = $body['title'];
+                    $quizDescription = $body['description'];
+                    
+                    $quizId = $quizSystem->createQuiz($quizTitle, $quizDescription);
+                    
+                    echo json_encode(["message" => "Quiz created successfully!", "quiz_id" => $quizId]);
+                } else {
+                    http_response_code(400);
+                    echo json_encode(["error" => "Quiz title and description are required."]);
+                }
+                break;
+
+                case "question":
+                    if (isset($request[1]) && is_numeric($request[1])) {
+                        $quizId = $request[1];
+                        $body = json_decode(file_get_contents("php://input"), true);
+                
+                        if (!isset($body['questions']) || !is_array($body['questions'])) {
+                            http_response_code(400);
+                            echo json_encode(["error" => "The 'questions' field must be a non-empty array."]);
+                            break;
+                        }
+                
+                        $questions = $body['questions'];
+                
+                        // Create questions and answers for the given quiz
+                        $response = $quizSystem->createQuestions($quizId, $questions);
+                
+                        if (isset($response['error'])) {
+                            http_response_code(400);
+                            echo json_encode($response);
+                        } else {
+                            echo json_encode(["message" => "Questions and answers added successfully to quiz ID: $quizId"]);
+                        }
+                    } else {
+                        http_response_code(400);
+                        echo json_encode(["error" => "Quiz ID is required and must be numeric."]);
+                    }
+                    break;
+
+                    case "answers":
+                        if (isset($request[1]) && is_numeric($request[1]) && isset($request[2]) && is_numeric($request[2])) {
+                            echo json_encode($post->createAnswers($request[1], $request[2], $body));
+                        } else {
+                            http_response_code(400);
+                            echo json_encode(["error" => "Quiz ID and Question ID are required."]);
+                        }
+                        break;
+        }
+        break;
+    }
+                    
+    case "PATCH":
+        {
+        $body = json_decode(file_get_contents("php://input"), true);
+
+        switch ($request[0]) {
+            case "admin":
+                if (isset($request[1])) {
+                    echo json_encode($patch->updateAdmin($request[1], $body));
+                } else {
+                    http_response_code(400);
+                    echo "Invalid PATCH Request. ID is required.";
+                }
+                break;  
+            default:
+                http_response_code(400);
+                echo "Invalid PATCH Request.";
+                break;
+        }
+        break;
+    }
+
+
+    case "DELETE":
+        {
+        switch ($request[0]) {
+            case "admin":
+                if (isset($request[1])) {
+                    echo json_encode($delete->deleteadmin($request[1]));
+                } else {
+                    http_response_code(400);
+                    echo "Invalid DELETE Request. ID is required.";
+                }
+                break;
+
+            default:
+                http_response_code(400);
+                echo "Invalid DELETE Request.";
+                break;
+        }
+        break;
+    }
+}
+?>
+
